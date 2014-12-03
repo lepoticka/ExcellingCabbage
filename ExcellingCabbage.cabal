@@ -16,9 +16,10 @@ build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
 
-executable excellingCabbage
-    main-is: excellingCabbage.hs
-
-    -- add precise dependencies
-    build-depends:  base >= 4.7 && <4.8, reactive-banana == 0.8.0.2, parsec == 3.1.7
-    Default-Language: Haskell2010
+Executable ExcellingCabbage
+    Main-Is:            excellingCabbage.hs
+    Build-Depends:      reactive-banana == 0.8.0.2,
+                        parsec == 3.1.7,
+                        base >= 4.2 && < 5
+--                    reactive-banana-wx
+    Default-Language:   Haskell2010
