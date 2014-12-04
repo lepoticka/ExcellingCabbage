@@ -13,16 +13,22 @@ data Expression = Const Integer
                 | Division Expression Expression
                 deriving (Show)
 
+-- expr = buildExpressionParser table (fmap (Const . toInteger. digitToInt) digit)
 expr :: Parser Expression
-expr = buildExpressionParser table (fmap (Const . toInteger. digitToInt) digit)
+expr = buildExpressionParser table factor
 
 table = [ [op "*" Mult AssocLeft, op "/" Division AssocLeft], [op "+" Add AssocLeft, op "-" Sub AssocLeft]]
         where
             op s f assoc = Infix( do {string s; return f; }) assoc
 
--- factor = do {char '('; x <- expr ; char ')'; return x}
---             <|> number
-            -- <?> "simple expression"
+factor = do {char '('; x <- expr ; char ')'; return x}
+            <|> number
+
+number :: Parser Expression
+number = do { 
+                ds <- many1 digit;
+                return (Const . read $ ds)
+            }
 
 -- Test: parseTest expr "2+3*5"
 --
