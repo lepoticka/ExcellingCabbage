@@ -1,23 +1,28 @@
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
+import Data.Char
 -- import Data.Maybe
 -- import Graphics.UI.WX hiding (Event)
 -- import Reactive.Banana
 -- import Reactive.Banana.WX
+data Expression = Const Integer
+                -- | Reference Coordinate
+                | Add Expression Expression
+                | Sub Expression Expression
+                | Mult Expression Expression
+                | Division Expression Expression
+                deriving (Show)
 
-expr :: Parser Integer
-expr = buildExpressionParser table factor <?> "expression"
+expr :: Parser Expression
+expr = buildExpressionParser table (fmap (Const . toInteger. digitToInt) digit)
 
-table = [ [op "*" (*) AssocLeft, op "/" div AssocLeft], [op "+" (+) AssocLeft, op "-" (-) AssocLeft]]
+table = [ [op "*" Mult AssocLeft, op "/" Division AssocLeft], [op "+" Add AssocLeft, op "-" Sub AssocLeft]]
         where
             op s f assoc = Infix( do {string s; return f; }) assoc
 
-factor = do {char '('; x <- expr ; char ')'; return x}
-            <|> number
-            <?> "simple expression"
-
-number :: Parser Integer
-number = do { ds <- many1 digit; return (read ds) } <?> "number"
+-- factor = do {char '('; x <- expr ; char ')'; return x}
+--             <|> number
+            -- <?> "simple expression"
 
 -- Test: parseTest expr "2+3*5"
 --
