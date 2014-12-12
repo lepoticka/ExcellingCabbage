@@ -8,8 +8,8 @@ module ExcellingCabbage(
 
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
--- import Data.Char
 
+-- Expression algebraic structure for representing arithmetic expressions
 data Expression = Constant Integer
                 | Add Expression Expression
                 | Sub Expression Expression
@@ -25,18 +25,21 @@ table = [ [op "*" Mult AssocLeft, op "/" Division AssocLeft], [op "+" Add AssocL
         where
             op s f assoc = Infix( do {string s; return f; }) assoc
 
+-- bracket parser
 factor = do {char '('; x <- expr ; char ')'; return x}
             <|> number
 
+-- number parser
 number :: Parser Expression
 number = do { 
                 ds <- many1 digit;
                 return (Constant . read $ ds)
             }
 
+-- Function for evaluation
 evaluate :: Expression -> Integer
-evaluate (Add a b) = (evaluate a) + (evaluate b)
-evaluate (Sub a b) = (evaluate a) - (evaluate b)
-evaluate (Mult a b) = (evaluate a) * (evaluate b)
-evaluate (Division a b) = (evaluate a) `div` (evaluate b)
+evaluate (Add a b) = evaluate a + evaluate b
+evaluate (Sub a b) = evaluate a - evaluate b
+evaluate (Mult a b) = evaluate a * evaluate b
+evaluate (Division a b) = evaluate a `div` evaluate b
 evaluate (Constant a) = a
