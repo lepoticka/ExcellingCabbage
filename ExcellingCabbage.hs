@@ -1,13 +1,14 @@
 module ExcellingCabbage(
     Expression(..),
-    expr,
     evaluate,
-    parse
+    processParse,
+    parseArithmetic
 ) where
 
 
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
+import Text.Parsec.Error
 
 -- Expression algebraic structure for representing arithmetic expressions
 data Expression = Constant Integer
@@ -18,8 +19,6 @@ data Expression = Constant Integer
                 deriving (Show)
                 -- | Reference Coordinate
 
-expr :: Parser Expression
-expr = buildExpressionParser table factor
 
 table = [ [op "*" Mult AssocLeft, op "/" Division AssocLeft], [op "+" Add AssocLeft, op "-" Sub AssocLeft]]
         where
@@ -35,6 +34,18 @@ number = do {
                 ds <- many1 digit;
                 return (Constant . read $ ds)
             }
+
+-- Parser for arithmetic expressions
+expr :: Parser Expression
+expr = buildExpressionParser table factor
+
+-- function for parsing
+parseArithmetic :: String -> Either Text.Parsec.Error.ParseError Expression
+parseArithmetic = parse expr ""
+
+processParse :: Either Text.Parsec.Error.ParseError Expression -> Expression
+processParse (Left _) = Constant 0
+processParse (Right a) = a
 
 -- Function for evaluation
 evaluate :: Expression -> Integer
