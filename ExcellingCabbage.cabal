@@ -19,7 +19,8 @@ cabal-version:       >=1.10
 Library
     exposed-modules:    ExcellingCabbage
     Build-Depends:      parsec == 3.1.7,
-                        base >= 4.2 && < 5
+                        base >= 4.2 && < 5,
+                        text
     Default-Language:   Haskell2010
 
 Executable excell
