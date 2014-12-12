@@ -9,15 +9,16 @@ module ExcellingCabbage(
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 import Text.Parsec.Error
+import Data.Char
 
 -- Expression algebraic structure for representing arithmetic expressions
 data Expression = Constant Integer
+                | Cell Int Int
                 | Add Expression Expression
                 | Sub Expression Expression
                 | Mult Expression Expression
                 | Division Expression Expression
                 deriving (Show)
-                -- | Reference Coordinate
 
 
 table = [ [op "*" Mult AssocLeft, op "/" Division AssocLeft], [op "+" Add AssocLeft, op "-" Sub AssocLeft]]
@@ -27,6 +28,7 @@ table = [ [op "*" Mult AssocLeft, op "/" Division AssocLeft], [op "+" Add AssocL
 -- bracket parser
 factor = do {char '('; x <- expr ; char ')'; return x}
             <|> number
+            <|> cell
 
 -- number parser
 number :: Parser Expression
@@ -34,6 +36,16 @@ number = do {
                 ds <- many1 digit;
                 return (Constant . read $ ds)
             }
+
+-- cell parser
+cell :: Parser Expression
+cell = do {
+         c <- oneOf "abcdef";
+         y <- many1 digit;
+         return (Cell (ord c - ord 'a') (read y))
+       }
+
+-- 
 
 -- Parser for arithmetic expressions
 expr :: Parser Expression
@@ -54,3 +66,4 @@ evaluate (Sub a b) = evaluate a - evaluate b
 evaluate (Mult a b) = evaluate a * evaluate b
 evaluate (Division a b) = evaluate a `div` evaluate b
 evaluate (Constant a) = a
+evaluate (Cell x y) = 1000 * toInteger x + toInteger y
