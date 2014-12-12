@@ -7,6 +7,16 @@ import Graphics.UI.Threepenny.Core
 
 import qualified ExcellingCabbage as EC
 
+parserBehavior :: Behavior (String -> EC.Expression)
+parserBehavior = pure (EC.processParse . EC.parseArithmetic)
+--
+evaluateBehavior :: Behavior (EC.Expression -> Integer)
+evaluateBehavior = pure EC.evaluate
+
+convertBehavior :: Behavior (Integer -> String)
+convertBehavior = pure show
+
+
 
 main::IO()
 main =  startGUI defaultConfig setup
@@ -25,16 +35,14 @@ setup window = void $ do
             ]]
 
     let 
-        parserBehavior      = pure (EC.parse EC.expr)
-        evaluateBehavior    = pure $ show . EC.evaluate
-
         procEvent           =  apply parserBehavior $ UI.valueChange inputCelica
         evalEvent           =  apply evaluateBehavior procEvent
+        convertEvent        = apply convertBehavior evalEvent
 
-    procBehavior        <- stepper (EC.Constant 0) procEvent
-    evalBehavior        <-  stepper "0" evalEvent
+    procBehavior            <- stepper (EC.Constant 0) procEvent
+    evalBehavior            <- stepper 0 evalEvent
+    convertBehavior         <- stepper "0" convertEvent
 
-    
     -- inputIn <- stepper "0" $ UI.valueChange inputCelica
 
-    element outputCelica # sink value evalBehavior
+    element outputCelica # sink value convertBehavior
