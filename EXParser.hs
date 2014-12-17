@@ -1,4 +1,4 @@
-module ExcellingCabbage(
+module EXParser(
     Expression(..),
     evaluate,
     processParse,
@@ -26,7 +26,8 @@ table = [ [op "*" Mult AssocLeft, op "/" Division AssocLeft], [op "+" Add AssocL
             op s f assoc = Infix( do {string s; return f; }) assoc
 
 -- bracket parser
-factor = do {char '('; x <- expr ; char ')'; return x}
+factor :: Parser Expression
+factor = do { _ <- char '('; x <- expr ; _ <- char ')'; return x}
             <|> number
             <|> cell
 
