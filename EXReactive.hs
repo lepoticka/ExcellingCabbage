@@ -1,5 +1,6 @@
 module EXReactive(
-  outputCell
+  outputCell,
+  Coordinates
 ) where
 
 import  qualified Graphics.UI.Threepenny as UI
@@ -27,17 +28,15 @@ addToAccumulate (x:xs) a
 
 
 processExpression :: [(Coordinates, Integer)] -> P.Expression -> P.Expression
-processExpression _ a@(P.Add _ _) = a
-processExpression _ a@(P.Sub _ _) = a
-processExpression _ a@(P.Mult _ _) = a
-processExpression _ a@(P.Division _ _) = a
 processExpression _ a@(P.Constant _) = a
-processExpression acc (P.Cell a b)
-  | null v = P.Constant 0
-  | otherwise = P.Constant $ snd $ head v
- where
-   cell = (a,b)
-   v = filter (\el -> fst el ==  cell) acc
+processExpression c (P.Add a b) = P.Add (processExpression c a) (processExpression c b)
+processExpression c (P.Sub a b) = P.Sub (processExpression c a) (processExpression c b)
+processExpression c (P.Mult a b) = P.Mult (processExpression c a) (processExpression c b)
+processExpression c (P.Division a b) = P.Division (processExpression c a) (processExpression c b)
+processExpression [] (P.Cell _ _) = P.Constant 0
+processExpression (x:xs) c@(P.Cell a b)
+  | fst x == (a,b) = P.Constant (snd x)
+  |otherwise = processExpression xs c
 
 
 -- return on enter trigered event and event handler
@@ -55,7 +54,6 @@ bufferedEvent inputCell = do
 
 
 -- configure and return output cell for excell
--- outputCell :: (Element, Coordinates, (Event (Int, Int), Handler (Int, Int))) -> UI Element
 outputCell :: (Element, Coordinates, (Event (Coordinates, Integer), Handler (Coordinates, Integer))) -> UI Element
 outputCell (inputCell, coordinates, joinpair) = do 
 
@@ -67,7 +65,6 @@ outputCell (inputCell, coordinates, joinpair) = do
   outputcell        <- UI.input
 
   finalpair <- liftIO newEvent :: UI(Event String, Handler String)
-
   accpair   <- liftIO newEvent :: UI (Event [(Coordinates, Integer)], Handler [(Coordinates, Integer)])
 
   let
@@ -75,14 +72,14 @@ outputCell (inputCell, coordinates, joinpair) = do
       joinHandle = snd joinpair
       final = fst finalpair
       finalHandler = snd finalpair
+      acc = fst accpair
+      accHandler = snd accpair
 
       fill :: Behavior (Coordinates -> Bool)
       fill = pure (flip elem) <*> refValueBehavior
       filteredEvent :: Event Coordinates
-      filteredEvent = filterApply fill $ apply (pure fst) join
+      filteredEvent = filterApply fill $ apply (pure fst) $ filterApply (pure (\s-> fst s /= coordinates)) join
 
-      acc = fst accpair
-      accHandler = snd accpair
       --
   accumulator   <- stepper [] acc
 
@@ -91,18 +88,14 @@ outputCell (inputCell, coordinates, joinpair) = do
       addToAccBeh = pure addToAccumulate <*> accumulator
 
       processExprBeh :: Behavior P.Expression
-      processExprBeh = pure processExpression <*> accumulator <*> exprBehavior
-
-  onEvent (apply addToAccBeh join) (liftIO . accHandler)
-
-  onEvent filteredEvent $ \_ -> liftIO $ finalHandler.show.P.evaluate =<< currentValue processExprBeh
-  onChanges exprBehavior $ \_ -> liftIO $ finalHandler.show.P.evaluate =<< currentValue processExprBeh
+      processExprBeh = (pure processExpression <*> accumulator) <*> exprBehavior
 
   finalBehavior <-stepper "0" final
 
-  onEvent (UI.valueChange outputcell) $ \_ -> liftIO $ joinHandle . (\s -> (coordinates, read s)) =<<  currentValue finalBehavior 
-  onChanges exprBehavior $ \_ -> liftIO $ finalHandler.show.P.evaluate =<< currentValue exprBehavior
-
+  onEvent (apply addToAccBeh join) (liftIO . accHandler)
+  onEvent filteredEvent $ \_ -> liftIO $ finalHandler.show.P.evaluate =<< currentValue processExprBeh
+  onEvent flush $ \_ -> liftIO $ finalHandler.show.P.evaluate =<< currentValue processExprBeh
+  onEvent final $ \_ -> liftIO $ joinHandle . (\s -> (coordinates, read s)) =<<  currentValue finalBehavior 
 
   _ <- element outputcell # sink value finalBehavior
 --

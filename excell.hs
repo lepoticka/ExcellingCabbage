@@ -13,7 +13,7 @@ setup window = void $ do
 
   inputCelica     <- UI.input
   inputCelica2     <- UI.input
-  event <- liftIO newEvent :: UI(Event (Int, Int), Handler (Int,Int))
+  event <- liftIO newEvent :: UI(Event (R.Coordinates, Integer), Handler (R.Coordinates, Integer))
   outputCelica  <- R.outputCell (inputCelica, (1,1), event)
   outputCelica2  <- R.outputCell (inputCelica2, (1,2), event)
 
