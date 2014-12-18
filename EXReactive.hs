@@ -7,32 +7,38 @@ import Graphics.UI.Threepenny.Core
 
 import qualified EXParser as P
 
-getReference :: P.Expression -> [(Int, Int)]
+type Coordinates = (Int, Int)
+
+
+getReference :: P.Expression -> [Coordinates]
 getReference (P.Constant _) = []
-getReference (P.Cell a b) = [(a, b)]
+getReference (P.Cell a b) = [(a,b)]
 getReference (P.Add a b) = getReference a ++ getReference b
 getReference (P.Sub a b) = getReference a ++ getReference b
 getReference (P.Mult a b) = getReference a ++ getReference b
 getReference (P.Division a b) = getReference a ++ getReference b
 
--- addToAccumulate :: [((Int, Int), Int)] -> ((Int, Int), Int) -> [((Int, Int), Int)]
--- addToAccumulate [] a = [a]
--- addToAccumulate (x:xs) a
---   | fst x == fst a = a:xs
---   | otherwise = x : addToAccumulate xs a
 
--- TODO: add Expression to equation class
--- processExpressions :: [(P.Expression, Integer)] -> P.Expression -> P.Expression
--- processExpressions _ a@(P.Add _ _) = a
--- processExpressions _ a@(P.Sub _ _) = a
--- processExpressions _ a@(P.Mult _ _) = a
--- processExpressions _ a@(P.Division _ _) = a
--- processExpressions _ a@(P.Constant _) = a
--- processExpressions acc e@(P.Cell _ _)
---   | null v = P.Constant 0
---   | otherwise = P.Constant $ snd $ head v
---  where
---    v = filter (\el -> fst el == e) acc
+addToAccumulate :: [(Coordinates, Integer)] -> (Coordinates, Integer) -> [(Coordinates, Integer)]
+addToAccumulate [] a = [a]
+addToAccumulate (x:xs) a
+  | fst x == fst a = a:xs
+  | otherwise = x : addToAccumulate xs a
+
+
+processExpression :: [(Coordinates, Integer)] -> P.Expression -> P.Expression
+processExpression _ a@(P.Add _ _) = a
+processExpression _ a@(P.Sub _ _) = a
+processExpression _ a@(P.Mult _ _) = a
+processExpression _ a@(P.Division _ _) = a
+processExpression _ a@(P.Constant _) = a
+processExpression acc (P.Cell a b)
+  | null v = P.Constant 0
+  | otherwise = P.Constant $ snd $ head v
+ where
+   cell = (a,b)
+   v = filter (\el -> fst el ==  cell) acc
+
 
 -- return on enter trigered event and event handler
 bufferedEvent :: Element -> UI (Event P.Expression, Handler P.Expression)
@@ -49,7 +55,8 @@ bufferedEvent inputCell = do
 
 
 -- configure and return output cell for excell
-outputCell :: (Element, (Int, Int), (Event (Int, Int), Handler (Int, Int))) -> UI Element
+-- outputCell :: (Element, Coordinates, (Event (Int, Int), Handler (Int, Int))) -> UI Element
+outputCell :: (Element, Coordinates, (Event (Coordinates, Integer), Handler (Coordinates, Integer))) -> UI Element
 outputCell (inputCell, coordinates, joinpair) = do 
 
   (flush, _)        <- bufferedEvent inputCell
@@ -61,7 +68,7 @@ outputCell (inputCell, coordinates, joinpair) = do
 
   finalpair <- liftIO newEvent :: UI(Event String, Handler String)
 
-  -- accpair   <- liftIO newEvent :: UI (Event [(Cell, Int)], Handler [(Cell, Int)])
+  accpair   <- liftIO newEvent :: UI (Event [(Coordinates, Integer)], Handler [(Coordinates, Integer)])
 
   let
       join = fst joinpair
@@ -69,26 +76,33 @@ outputCell (inputCell, coordinates, joinpair) = do
       final = fst finalpair
       finalHandler = snd finalpair
 
-      fill :: Behavior ((Int, Int) -> Bool)
-      -- fill = pure (\a b->b `elem` a) <*> refValueBehavior
+      fill :: Behavior (Coordinates -> Bool)
       fill = pure (flip elem) <*> refValueBehavior
-      filteredEvent :: Event (Int, Int)
-      filteredEvent = filterApply fill join
+      filteredEvent :: Event Coordinates
+      filteredEvent = filterApply fill $ apply (pure fst) join
 
-      -- acc = fst accpair
-      -- accHandler = snd accpair
+      acc = fst accpair
+      accHandler = snd accpair
       --
-  -- accumulator   <- stepper [] acc
-  -- onEvent join $ lift IO $ accHandler . (addToAccumulate =<< currentValue accumulator)
+  accumulator   <- stepper [] acc
 
-  onEvent (UI.valueChange outputcell) $ \_ -> liftIO $ joinHandle coordinates
-  onEvent filteredEvent $ \_ -> liftIO $ finalHandler.show.P.evaluate =<< currentValue exprBehavior
-  -- onEvent filteredEvent $ \_ -> liftIO $ finalHandler.show.P.evaluate.(proccessExpression =<< currentValue accumulator) =<< currentValue exprBehavior - after equation class is added
+  let
+      addToAccBeh :: Behavior ((Coordinates, Integer) -> [(Coordinates, Integer)])
+      addToAccBeh = pure addToAccumulate <*> accumulator
+
+      processExprBeh :: Behavior P.Expression
+      processExprBeh = pure processExpression <*> accumulator <*> exprBehavior
+
+  onEvent (apply addToAccBeh join) (liftIO . accHandler)
+
+  onEvent filteredEvent $ \_ -> liftIO $ finalHandler.show.P.evaluate =<< currentValue processExprBeh
+  onChanges exprBehavior $ \_ -> liftIO $ finalHandler.show.P.evaluate =<< currentValue processExprBeh
 
   finalBehavior <-stepper "0" final
 
+  onEvent (UI.valueChange outputcell) $ \_ -> liftIO $ joinHandle . (\s -> (coordinates, read s)) =<<  currentValue finalBehavior 
   onChanges exprBehavior $ \_ -> liftIO $ finalHandler.show.P.evaluate =<< currentValue exprBehavior
-  -- onChanges exprBehavior $ \_ -> liftIO $ finalHandler.show.P.evaluate.(proccessExpression =<< currentValue accumulator) =<< currentValue exprBehavior - after equation class
+
 
   _ <- element outputcell # sink value finalBehavior
 --
