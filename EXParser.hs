@@ -23,7 +23,7 @@ data Expression = Constant Integer
 
 table = [ [op "*" Mult AssocLeft, op "/" Division AssocLeft], [op "+" Add AssocLeft, op "-" Sub AssocLeft]]
         where
-            op s f assoc = Infix( do {string s; return f; }) assoc
+            op s f assoc = Infix( do {_ <- string s; return f; }) assoc
 
 -- bracket parser
 factor :: Parser Expression
@@ -52,9 +52,16 @@ cell = do {
 expr :: Parser Expression
 expr = buildExpressionParser table factor
 
+-- Space removal
+removeSpace :: String -> String
+removeSpace [] = []
+removeSpace (x:xs)
+  | isSpace x = removeSpace xs
+  | otherwise = x: removeSpace xs
+
 -- function for parsing
 parseArithmetic :: String -> Either Text.Parsec.Error.ParseError Expression
-parseArithmetic = parse expr ""
+parseArithmetic = parse expr "" . removeSpace
 
 processParse :: Either Text.Parsec.Error.ParseError Expression -> Expression
 processParse (Left _) = Constant 0
