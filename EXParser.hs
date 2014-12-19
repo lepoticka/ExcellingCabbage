@@ -23,7 +23,7 @@ data Expression = Constant Integer
 
 table = [ [op "*" Mult AssocLeft, op "/" Division AssocLeft], [op "+" Add AssocLeft, op "-" Sub AssocLeft]]
         where
-            op s f assoc = Infix( do {string s; return f; }) assoc
+            op s f assoc = Infix( do {_ <- string s; return f; }) assoc
 
 -- bracket parser
 factor :: Parser Expression
@@ -43,7 +43,7 @@ cell :: Parser Expression
 cell = do {
          c <- oneOf "abcdef";
          y <- many1 digit;
-         return (Cell (ord c - ord 'a') (read y))
+         return (Cell (ord c - ord 'a' + 1) (read y))
        }
 
 -- 
@@ -52,9 +52,16 @@ cell = do {
 expr :: Parser Expression
 expr = buildExpressionParser table factor
 
+-- Space removal
+removeSpace :: String -> String
+removeSpace [] = []
+removeSpace (x:xs)
+  | isSpace x = removeSpace xs
+  | otherwise = x: removeSpace xs
+
 -- function for parsing
 parseArithmetic :: String -> Either Text.Parsec.Error.ParseError Expression
-parseArithmetic = parse expr ""
+parseArithmetic = parse expr "" . removeSpace
 
 processParse :: Either Text.Parsec.Error.ParseError Expression -> Expression
 processParse (Left _) = Constant 0
@@ -67,4 +74,4 @@ evaluate (Sub a b) = evaluate a - evaluate b
 evaluate (Mult a b) = evaluate a * evaluate b
 evaluate (Division a b) = evaluate a `div` evaluate b
 evaluate (Constant a) = a
-evaluate (Cell x y) = 1000 * toInteger x + toInteger y
+evaluate (Cell _ _) = 0
