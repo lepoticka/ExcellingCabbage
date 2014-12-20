@@ -20,7 +20,7 @@ setup window = void $ do
       outputsUI = map (map $ flip R.ioCell event) coordinates
 
   outputs <- mapM sequence outputsUI
-      
+
   getBody window #+ [
     column [ R.makeGrid outputs
       ]]

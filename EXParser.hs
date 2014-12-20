@@ -21,15 +21,20 @@ data Expression = Constant Integer
                 deriving (Show)
 
 
+table :: OperatorTable Char () Expression
 table = [ [op "*" Mult AssocLeft, op "/" Division AssocLeft], [op "+" Add AssocLeft, op "-" Sub AssocLeft]]
         where
-            op s f assoc = Infix( do {_ <- string s; return f; }) assoc
+            op s f assoc = Infix( do {_ <- string s; return f;} ) assoc
 
 -- bracket parser
 factor :: Parser Expression
-factor = do { _ <- char '('; x <- expr ; _ <- char ')'; return x}
-            <|> number
-            <|> cell
+factor = do { 
+          _ <- char '('; 
+          x <- expr ; 
+          _ <- char ')'; 
+          return x
+        } <|> number
+          <|> cell
 
 -- number parser
 number :: Parser Expression
@@ -38,19 +43,13 @@ number = do {
                 return (Constant . read $ ds)
             }
 
--- cell parser
+-- cell notation parser
 cell :: Parser Expression
 cell = do {
-         c <- oneOf "abcdef";
+         c <- lower;
          y <- many1 digit;
          return (Cell (ord c - ord 'a' + 1) (read y))
        }
-
--- 
-
--- Parser for arithmetic expressions
-expr :: Parser Expression
-expr = buildExpressionParser table factor
 
 -- Space removal
 removeSpace :: String -> String
@@ -58,6 +57,12 @@ removeSpace [] = []
 removeSpace (x:xs)
   | isSpace x = removeSpace xs
   | otherwise = x: removeSpace xs
+
+
+-- Parser for arithmetic expressions
+expr :: Parser Expression
+expr = buildExpressionParser table factor
+
 
 -- function for parsing
 parseArithmetic :: String -> Either Text.Parsec.Error.ParseError Expression
