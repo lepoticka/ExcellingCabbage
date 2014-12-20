@@ -1,5 +1,5 @@
 module EXReactive(
-  outputCell,
+  ioCell,
   makeGrid,
   Coordinates
 ) where
@@ -55,15 +55,15 @@ bufferedEvent inputCell = do
 
 
 -- configure and return output cell for excell
-outputCell :: Element -> Coordinates -> (Event (Coordinates, Integer), Handler (Coordinates, Integer)) -> UI Element
-outputCell inputCell coordinates joinpair = do 
+ioCell :: Coordinates -> (Event (Coordinates, Integer), Handler (Coordinates, Integer)) -> UI Element
+ioCell coordinates joinpair = do 
 
-  (flush, _)        <- bufferedEvent inputCell
+  outputcell        <- UI.input
+  (flush, _)        <- bufferedEvent outputcell
 
   refValueBehavior  <- stepper [] $ apply (pure getReference) flush
   exprBehavior      <- stepper (P.Constant 0) flush
 
-  outputcell        <- UI.input
 
   finalpair <- liftIO newEvent :: UI(Event String, Handler String)
   accpair   <- liftIO newEvent :: UI (Event [(Coordinates, Integer)], Handler [(Coordinates, Integer)])

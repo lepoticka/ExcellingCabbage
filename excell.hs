@@ -11,21 +11,16 @@ setup window = void $ do
   return window # set title "Excell"
 
   event <- liftIO newEvent :: UI(Event (R.Coordinates, Integer), Handler (R.Coordinates, Integer))
-  inputs <- replicateM 5 (replicateM 5 UI.input)
   let
+      -- coordinates of the cells
       coordinates :: [[R.Coordinates]]
-      coordinates = [[(a,b)| a <- [1..5]] | b <- [1..5]]
-
-      cooin :: [[(Element, R.Coordinates)]]
-      cooin = zipWith zip inputs coordinates
+      coordinates = [[(a,b)| a <- [1..5]] |   b <- [1..5]]
 
       outputsUI :: [[UI Element]]
-      outputsUI = map ( map(\(a,b) -> R.outputCell a b event) )cooin
-      outputsUIp :: UI [[Element]]
-      outputsUIp = mapM sequence outputsUI
+      outputsUI = map (map $ flip R.ioCell event) coordinates
 
-  outputs <- outputsUIp
+  outputs <- mapM sequence outputsUI
       
   getBody window #+ [
-    column [ R.makeGrid inputs, R.makeGrid outputs
+    column [ R.makeGrid outputs
       ]]
