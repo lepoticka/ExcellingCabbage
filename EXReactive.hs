@@ -55,8 +55,8 @@ bufferedEvent inputCell = do
 
 
 -- configure and return output cell for excell
-outputCell :: (Element, Coordinates, (Event (Coordinates, Integer), Handler (Coordinates, Integer))) -> UI Element
-outputCell (inputCell, coordinates, joinpair) = do 
+outputCell :: Element -> Coordinates -> (Event (Coordinates, Integer), Handler (Coordinates, Integer)) -> UI Element
+outputCell inputCell coordinates joinpair = do 
 
   (flush, _)        <- bufferedEvent inputCell
 
@@ -106,6 +106,6 @@ outputCell (inputCell, coordinates, joinpair) = do
 makeGrid :: [[Element]] -> UI Element
 makeGrid field = grid $ map string letters : [string ( show num) : map element (field !! (num -1))  | num <- [1..height]]
   where
-    letters = "" : [chr  ( ord 'a' + num - 1 ) :  show num | num <- [1..width]]
+    letters = "" : [[chr  ( ord 'a' + num - 1 )] | num <- [1..width]]
     height = length field
     width = length $ head field
