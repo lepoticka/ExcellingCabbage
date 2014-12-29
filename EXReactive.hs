@@ -10,21 +10,24 @@ import Data.Char
 import qualified EXParser as P
 
 
--- type for denoting cell
 type Coordinates = (Int, Int)
+type References = [Coordinates]
+type FeedbackValue = (Coordinates, Integer)
+type FeedbackValues = [FeedbackValue]
+data ExError = ParseError | EvaluationError | NoValue
 
 
 -- make display grid
 makeGrid :: [[Element]] -> UI Element
-makeGrid field = grid $ map string letters : [string ( show num) : map element (field !! (num -1))  | num <- [1..height]]
+makeGrid field = grid $ letters : field2
   where
-    letters = "" : [[chr  ( ord 'a' + num - 1 )] | num <- [1..width]]
-    height = length field
     width = length $ head field
+    letters = string "" : map (string.(: []).chr.(+) (ord 'a' -1)) [1..width]
+    field2 = zipWith (:) (map (string.show) [1..width]) $ map (map element) field
 
 
 -- get cell values from Expression
-getReference :: P.Expression -> [Coordinates]
+getReference :: P.Expression -> References
 getReference (P.Constant _) = []
 getReference (P.Cell a b) = [(a,b)]
 getReference (P.Add a b) = getReference a ++ getReference b
@@ -34,7 +37,7 @@ getReference (P.Division a b) = getReference a ++ getReference b
 
 
 -- accumulate new value
-addToAccumulate :: [(Coordinates, Integer)] -> (Coordinates, Integer) -> [(Coordinates, Integer)]
+addToAccumulate :: FeedbackValues -> FeedbackValue -> FeedbackValues
 addToAccumulate [] a = [a]
 addToAccumulate (x:xs) a
   | fst x == fst a = a:xs
@@ -42,13 +45,13 @@ addToAccumulate (x:xs) a
 
 
 -- remove cell reference in expression
-processExpression :: [(Coordinates, Integer)] -> P.Expression -> P.Expression
+processExpression :: FeedbackValues -> P.Expression -> P.Expression
+processExpression [] (P.Cell _ _) = P.Constant 0
 processExpression _ a@(P.Constant _) = a
 processExpression c (P.Add a b) = P.Add (processExpression c a) (processExpression c b)
 processExpression c (P.Sub a b) = P.Sub (processExpression c a) (processExpression c b)
 processExpression c (P.Mult a b) = P.Mult (processExpression c a) (processExpression c b)
 processExpression c (P.Division a b) = P.Division (processExpression c a) (processExpression c b)
-processExpression [] (P.Cell _ _) = P.Constant 0
 processExpression (x:xs) c@(P.Cell a b)
   | fst x == (a,b) = P.Constant (snd x)
   |otherwise = processExpression xs c
@@ -69,7 +72,7 @@ bufferedEvent inputCell = do
 
 
 -- return filtered coordinates from joined event
-getFilteredEvent :: Coordinates -> Event P.Expression -> Event (Coordinates, Integer)-> UI (Event Coordinates)
+getFilteredEvent :: Coordinates -> Event P.Expression -> Event FeedbackValue -> UI (Event Coordinates)
 getFilteredEvent coordinates flush join = do
   refValueBehavior  <- stepper [] $ apply (pure getReference) flush
 
@@ -83,9 +86,9 @@ getFilteredEvent coordinates flush join = do
 
 
 --make accumulate Behavior
-makeAccumulator:: Event (Coordinates, Integer) -> UI (Behavior [(Coordinates, Integer)])
+makeAccumulator:: Event FeedbackValue -> UI (Behavior FeedbackValues)
 makeAccumulator join = do
-  accpair   <- liftIO newEvent :: UI (Event [(Coordinates, Integer)], Handler [(Coordinates, Integer)])
+  accpair   <- liftIO newEvent :: UI (Event FeedbackValues, Handler FeedbackValues)
 
   let
       acc = fst accpair
@@ -94,14 +97,14 @@ makeAccumulator join = do
   accumulator   <- stepper [] acc
 
   let
-      addToAccBeh :: Behavior ((Coordinates, Integer) -> [(Coordinates, Integer)])
+      addToAccBeh :: Behavior ( FeedbackValue -> FeedbackValues)
       addToAccBeh = pure addToAccumulate <*> accumulator
 
   onEvent (apply addToAccBeh join) (liftIO . accHandler)
   return accumulator
 
 -- configure and return output cell for excell
-ioCell :: Coordinates -> (Event (Coordinates, Integer), Handler (Coordinates, Integer)) -> UI Element
+ioCell :: Coordinates -> (Event FeedbackValue, Handler FeedbackValue) -> UI Element
 ioCell coordinates joinpair = do
 
   -- creating elements and events
