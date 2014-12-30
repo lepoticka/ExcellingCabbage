@@ -7,14 +7,10 @@ module EXReactive(
 import  qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
 import Data.Char
+import Data.Either
+import Control.Monad
+import EXData
 import qualified EXParser as P
-
-
-type Coordinates = (Int, Int)
-type References = [Coordinates]
-type FeedbackValue = (Coordinates, Integer)
-type FeedbackValues = [FeedbackValue]
-data ExError = ParseError | EvaluationError | NoValue
 
 
 -- make display grid
@@ -27,13 +23,13 @@ makeGrid field = grid $ letters : field2
 
 
 -- get cell values from Expression
-getReference :: P.Expression -> References
-getReference (P.Constant _) = []
-getReference (P.Cell a b) = [(a,b)]
-getReference (P.Add a b) = getReference a ++ getReference b
-getReference (P.Sub a b) = getReference a ++ getReference b
-getReference (P.Mult a b) = getReference a ++ getReference b
-getReference (P.Division a b) = getReference a ++ getReference b
+getReference :: Expression -> Either ExError References
+getReference (Constant _) = Right []
+getReference (Cell a b) = Right [(a,b)]
+getReference (Add a b) = liftM2 (++) (getReference a) $ getReference b
+getReference (Sub a b) = liftM2 (++) (getReference a) $ getReference b
+getReference (Mult a b) = liftM2 (++) (getReference a) $ getReference b
+getReference (Division a b) = liftM2 (++) (getReference a) $ getReference b
 
 
 -- accumulate new value
@@ -45,23 +41,23 @@ addToAccumulate (x:xs) a
 
 
 -- remove cell reference in expression
-processExpression :: FeedbackValues -> P.Expression -> P.Expression
-processExpression [] (P.Cell _ _) = P.Constant 0
-processExpression _ a@(P.Constant _) = a
-processExpression c (P.Add a b) = P.Add (processExpression c a) (processExpression c b)
-processExpression c (P.Sub a b) = P.Sub (processExpression c a) (processExpression c b)
-processExpression c (P.Mult a b) = P.Mult (processExpression c a) (processExpression c b)
-processExpression c (P.Division a b) = P.Division (processExpression c a) (processExpression c b)
-processExpression (x:xs) c@(P.Cell a b)
-  | fst x == (a,b) = P.Constant (snd x)
+processExpression :: FeedbackValues -> Expression -> Either ExError Expression
+processExpression c (Add a b) = liftM2 Add (processExpression c a) (processExpression c b)
+processExpression c (Sub a b) = liftM2 Sub (processExpression c a) (processExpression c b)
+processExpression c (Mult a b) = liftM2 Mult (processExpression c a) (processExpression c b)
+processExpression c (Division a b) = liftM2 Division (processExpression c a) (processExpression c b)
+processExpression _ a@(Constant _) = Right a
+processExpression [] (Cell _ _) = Left NoValue
+processExpression (x:xs) c@(Cell a b)
+  | fst x == (a,b) = Right (Constant (snd x))
   |otherwise = processExpression xs c
 
 
 -- return on enter trigered Expression and event handler
-bufferedEvent :: Element -> UI (Event P.Expression, Handler P.Expression)
+bufferedEvent :: Element -> UI (Event Expression, Handler Expression)
 bufferedEvent inputCell = do
-  buffer    <- stepper (P.Constant 0) $ apply (pure (P.processParse . P.parseArithmetic)) $ UI.valueChange inputCell
-  flushpair <- liftIO newEvent :: UI(Event P.Expression, Handler P.Expression)
+  buffer    <- stepper (Constant 0) $ apply (pure (P.processParse . P.parseArithmetic)) $ UI.valueChange inputCell
+  flushpair <- liftIO newEvent :: UI(Event Expression, Handler Expression)
 
   let
       flushHandle = snd flushpair
@@ -72,7 +68,7 @@ bufferedEvent inputCell = do
 
 
 -- return filtered coordinates from joined event
-getFilteredEvent :: Coordinates -> Event P.Expression -> Event FeedbackValue -> UI (Event Coordinates)
+getFilteredEvent :: Coordinates -> Event Expression -> Event FeedbackValue -> UI (Event Coordinates)
 getFilteredEvent coordinates flush join = do
   refValueBehavior  <- stepper [] $ apply (pure getReference) flush
 
@@ -111,7 +107,7 @@ ioCell coordinates joinpair = do
   outputcell        <- UI.input
   (flush, _)        <- bufferedEvent outputcell
 
-  exprBehavior      <- stepper (P.Constant 0) flush
+  prBehavior      <- stepper (Constant 0) flush
   finalpair <- liftIO newEvent :: UI(Event String, Handler String)
 
   let
@@ -125,7 +121,7 @@ ioCell coordinates joinpair = do
 
   let
       -- make behavior for proccessing expression
-      processExprBeh :: Behavior P.Expression
+      processExprBeh :: Behavior Expression
       processExprBeh = (pure processExpression <*> accumulator) <*> exprBehavior
 
   -- on filtered event evaluate expression and add it for display at final event

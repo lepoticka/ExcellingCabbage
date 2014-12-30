@@ -17,7 +17,7 @@ extra-source-files:  README.md
 cabal-version:       >=1.10
 
 Library
-    exposed-modules:    EXParser, EXReactive
+    exposed-modules:    EXParser, EXReactive, EXData
     Build-Depends:      parsec == 3.1.7,
                         threepenny-gui == 0.5.0.0,
                         base >= 4.2 && < 5,

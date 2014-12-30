@@ -10,15 +10,7 @@ import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 import Text.Parsec.Error
 import Data.Char
-
--- Expression algebraic structure for representing arithmetic expressions
-data Expression = Constant Integer
-                | Cell Int Int
-                | Add Expression Expression
-                | Sub Expression Expression
-                | Mult Expression Expression
-                | Division Expression Expression
-                deriving (Show)
+import EXData
 
 
 table :: OperatorTable Char () Expression
@@ -68,9 +60,9 @@ expr = buildExpressionParser table factor
 parseArithmetic :: String -> Either Text.Parsec.Error.ParseError Expression
 parseArithmetic = parse expr "" . removeSpace
 
-processParse :: Either Text.Parsec.Error.ParseError Expression -> Expression
-processParse (Left _) = Constant 0
-processParse (Right a) = a
+processParse :: Either Text.Parsec.Error.ParseError Expression -> Either ExError Expression
+processParse (Left _) = Left ParseError
+processParse (Right a) = Right a
 
 -- Function for evaluation
 evaluate :: Expression -> Integer
