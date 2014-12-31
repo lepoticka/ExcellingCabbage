@@ -53,6 +53,14 @@ processExpression (x:xs) c@(Cell a b)
   |otherwise = processExpression xs c
 
 
+-- display nformation to the user
+showOutput :: Either ExError Integer -> String
+showOutput (Left ParseError ) = "PARSE ERROR"
+showOutput (Left EvaluationError) = "EVALUATION ERROR"
+showOutput (Left NoValue) = "FREE VARIABLES"
+showOutput (Right a) = show a
+
+
 -- return on enter trigered Expression and event handler
 bufferedEvent :: Element -> UI (Event Expression, Handler Expression)
 bufferedEvent inputCell = do
