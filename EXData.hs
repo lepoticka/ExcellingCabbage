@@ -11,7 +11,7 @@ type Coordinates = (Int, Int)
 type References = [Coordinates]
 type FeedbackValue = (Coordinates, Integer)
 type FeedbackValues = [FeedbackValue]
-data ExError = ParseError | EvaluationError | NoValue
+data ExError = ParseError | EvaluationError | NoValue | ReferenceError
 
 data Expression = Constant Integer
                 | Cell Int Int

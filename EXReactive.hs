@@ -57,15 +57,16 @@ processExpression (x:xs) c@(Cell a b)
 showOutput :: Either ExError Integer -> String
 showOutput (Left ParseError ) = "PARSE ERROR"
 showOutput (Left EvaluationError) = "EVALUATION ERROR"
-showOutput (Left NoValue) = "FREE VARIABLES"
+showOutput (Left ReferenceError) = "REFERENCE ERROR"
+showOutput (Left NoValue) = ""
 showOutput (Right a) = show a
 
 
 -- return on enter trigered Expression and event handler
-bufferedEvent :: Element -> UI (Event Expression, Handler Expression)
+bufferedEvent :: Element -> UI (Event (Either ExError Expression), Handler (Either ExError Expression))
 bufferedEvent inputCell = do
-  buffer    <- stepper (Constant 0) $ apply (pure (P.processParse . P.parseArithmetic)) $ UI.valueChange inputCell
-  flushpair <- liftIO newEvent :: UI(Event Expression, Handler Expression)
+  buffer    <- stepper (Left NoValue) $ apply (pure (P.processParse . P.parseArithmetic)) $ UI.valueChange inputCell
+  flushpair <- liftIO newEvent :: UI(Event (Either ExError Expression), Handler (Either ExError Expression))
 
   let
       flushHandle = snd flushpair
@@ -76,17 +77,19 @@ bufferedEvent inputCell = do
 
 
 -- return filtered coordinates from joined event
-getFilteredEvent :: Coordinates -> Event Expression -> Event FeedbackValue -> UI (Event Coordinates)
+getFilteredEvent :: Coordinates -> Event (Either ExError Expression) -> Event FeedbackValue -> Event FeedbackValue
 getFilteredEvent coordinates flush join = do
-  refValueBehavior  <- stepper [] $ apply (pure getReference) flush
+
+  refValueBehavior  <- stepper (Left NoValue) $ flip apply flush $ pure $ (=<<) getReference
 
   let
-      fill :: Behavior (Coordinates -> Bool)
-      fill = pure (flip elem) <*> refValueBehavior
-      filteredEvent :: Event Coordinates
-      filteredEvent = filterApply fill $ apply (pure fst) $ filterApply (pure (\s-> fst s /= coordinates)) join
+      checkReference :: Either ExError References -> FeedbackValue -> Bool
+      checkReference (Left _) _ = False
+      checkReference (Right a) v = fst v `elem` a
 
-  return filteredEvent
+      checkReferenceBeh = pure checkReference <*> refValueBehavior
+
+  filterApply checkReferenceBeh $ filterE (\e -> fst e /= coordinates) join
 
 
 --make accumulate Behavior
@@ -115,7 +118,7 @@ ioCell coordinates joinpair = do
   outputcell        <- UI.input
   (flush, _)        <- bufferedEvent outputcell
 
-  prBehavior      <- stepper (Constant 0) flush
+  exprBehavior      <- stepper (Left NoValue) flush
   finalpair <- liftIO newEvent :: UI(Event String, Handler String)
 
   let
