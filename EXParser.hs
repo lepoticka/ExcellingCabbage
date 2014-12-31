@@ -11,6 +11,7 @@ import Text.ParserCombinators.Parsec.Expr
 import Text.Parsec.Error
 import Data.Char
 import EXData
+import Control.Monad
 
 
 table :: OperatorTable Char () Expression
@@ -65,10 +66,10 @@ processParse (Left _) = Left ParseError
 processParse (Right a) = Right a
 
 -- Function for evaluation
-evaluate :: Expression -> Integer
-evaluate (Add a b) = evaluate a + evaluate b
-evaluate (Sub a b) = evaluate a - evaluate b
-evaluate (Mult a b) = evaluate a * evaluate b
-evaluate (Division a b) = evaluate a `div` evaluate b
-evaluate (Constant a) = a
-evaluate (Cell _ _) = 0
+evaluate :: Expression -> Either ExError Integer
+evaluate (Cell _ _) = Left EvaluationError
+evaluate (Constant a) = Right a
+evaluate (Add a b) = liftM2 (+) (evaluate a) (evaluate b)
+evaluate (Sub a b) = liftM2 (-) (evaluate a) (evaluate b)
+evaluate (Mult a b) = liftM2 (*) (evaluate a) (evaluate b)
+evaluate (Division a b) = liftM2 div (evaluate a) (evaluate b)
