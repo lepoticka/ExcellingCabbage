@@ -12,6 +12,7 @@ import Text.Parsec.Error
 import Data.Char
 import EXData
 import Control.Monad
+import Data.Either.Unwrap
 
 
 table :: OperatorTable Char () Expression
@@ -65,11 +66,18 @@ processParse :: Either Text.Parsec.Error.ParseError Expression -> Either ExError
 processParse (Left _) = Left ParseError
 processParse (Right a) = Right a
 
+evaluate :: Expression -> Either ExError Expression
+evaluate expression
+  | isRight value = fmap Constant value
+  |otherwise = Left $ fromLeft value
+ where
+   value = evaluateHelper expression
+
 -- Function for evaluation
-evaluate :: Expression -> Either ExError Integer
-evaluate (Cell _ _) = Left EvaluationError
-evaluate (Constant a) = Right a
-evaluate (Add a b) = liftM2 (+) (evaluate a) (evaluate b)
-evaluate (Sub a b) = liftM2 (-) (evaluate a) (evaluate b)
-evaluate (Mult a b) = liftM2 (*) (evaluate a) (evaluate b)
-evaluate (Division a b) = liftM2 div (evaluate a) (evaluate b)
+evaluateHelper :: Expression -> Either ExError Integer
+evaluateHelper (Cell _ _) = Left EvaluationError
+evaluateHelper (Constant a) = Right a
+evaluateHelper (Add a b) = liftM2 (+) (evaluateHelper a) (evaluateHelper b)
+evaluateHelper (Sub a b) = liftM2 (-) (evaluateHelper a) (evaluateHelper b)
+evaluateHelper (Mult a b) = liftM2 (*) (evaluateHelper a) (evaluateHelper b)
+evaluateHelper (Division a b) = liftM2 div (evaluateHelper a) (evaluateHelper b)

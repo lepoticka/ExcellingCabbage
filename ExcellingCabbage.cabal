@@ -21,7 +21,8 @@ Library
     Build-Depends:      parsec == 3.1.7,
                         threepenny-gui == 0.5.0.0,
                         base >= 4.2 && < 5,
-                        text
+                        text,
+                        either-unwrap == 1.1
     Default-Language:   Haskell2010
 
 Executable excell
@@ -30,5 +31,6 @@ Executable excell
                         threepenny-gui == 0.5.0.0,
                         base >= 4.2 && < 5,
                         safe,
-                        parsec == 3.1.7 
+                        parsec == 3.1.7,
+                        either-unwrap == 1.1
     Default-Language:   Haskell2010

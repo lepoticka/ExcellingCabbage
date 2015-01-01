@@ -7,9 +7,9 @@ module EXReactive(
 import  qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
 import Data.Char
-import Data.Either
 import Control.Monad
 import EXData
+import Data.Maybe
 import qualified EXParser as P
 
 
@@ -20,16 +20,6 @@ makeGrid field = grid $ letters : field2
     width = length $ head field
     letters = string "" : map (string.(: []).chr.(+) (ord 'a' -1)) [1..width]
     field2 = zipWith (:) (map (string.show) [1..width]) $ map (map element) field
-
-
--- get cell values from Expression
-getReference :: Expression -> Either ExError References
-getReference (Constant _) = Right []
-getReference (Cell a b) = Right [(a,b)]
-getReference (Add a b) = liftM2 (++) (getReference a) $ getReference b
-getReference (Sub a b) = liftM2 (++) (getReference a) $ getReference b
-getReference (Mult a b) = liftM2 (++) (getReference a) $ getReference b
-getReference (Division a b) = liftM2 (++) (getReference a) $ getReference b
 
 
 -- accumulate new value
@@ -49,17 +39,31 @@ processExpression c (Division a b) = liftM2 Division (processExpression c a) (pr
 processExpression _ a@(Constant _) = Right a
 processExpression [] (Cell _ _) = Left NoValue
 processExpression (x:xs) c@(Cell a b)
-  | fst x == (a,b) = Right (Constant (snd x))
+  | fst x == (a,b) && isJust (snd x) = Right (Constant (fromJust $ snd x))
   |otherwise = processExpression xs c
 
 
 -- display nformation to the user
-showOutput :: Either ExError Integer -> String
+showOutput :: Either ExError Expression -> String
 showOutput (Left ParseError ) = "PARSE ERROR"
 showOutput (Left EvaluationError) = "EVALUATION ERROR"
 showOutput (Left ReferenceError) = "REFERENCE ERROR"
 showOutput (Left NoValue) = ""
-showOutput (Right a) = show a
+showOutput (Right (Constant a)) = show a
+showOutput (Right (Add _ _)) = "INTERNAL ERROR"
+showOutput (Right (Sub _ _)) = "INTERNAL ERROR"
+showOutput (Right (Mult _ _)) = "INTERNAL ERROR"
+showOutput (Right (Division _ _)) = "INTERNAL ERROR"
+showOutput (Right (Cell _ _)) = "INTERNAL ERROR"
+
+toFeedback :: Coordinates -> Either ExError Expression -> FeedbackValue
+toFeedback coordinates (Left _) = (coordinates, Nothing)
+toFeedback coordinates (Right (Constant a)) = (coordinates, Just a)
+toFeedback coordinates (Right (Cell _ _)) = (coordinates, Nothing)
+toFeedback coordinates (Right (Add _ _)) = (coordinates, Nothing)
+toFeedback coordinates (Right (Sub _ _)) = (coordinates, Nothing)
+toFeedback coordinates (Right (Mult _ _)) = (coordinates, Nothing)
+toFeedback coordinates (Right (Division _ _)) = (coordinates, Nothing)
 
 
 -- return on enter trigered Expression and event handler
@@ -76,25 +80,9 @@ bufferedEvent inputCell = do
   return flushpair
 
 
--- return filtered coordinates from joined event
-getFilteredEvent :: Coordinates -> Event (Either ExError Expression) -> Event FeedbackValue -> Event FeedbackValue
-getFilteredEvent coordinates flush join = do
-
-  refValueBehavior  <- stepper (Left NoValue) $ flip apply flush $ pure $ (=<<) getReference
-
-  let
-      checkReference :: Either ExError References -> FeedbackValue -> Bool
-      checkReference (Left _) _ = False
-      checkReference (Right a) v = fst v `elem` a
-
-      checkReferenceBeh = pure checkReference <*> refValueBehavior
-
-  filterApply checkReferenceBeh $ filterE (\e -> fst e /= coordinates) join
-
-
 --make accumulate Behavior
 makeAccumulator:: Event FeedbackValue -> UI (Behavior FeedbackValues)
-makeAccumulator join = do
+makeAccumulator joinnEvent = do
   accpair   <- liftIO newEvent :: UI (Event FeedbackValues, Handler FeedbackValues)
 
   let
@@ -107,46 +95,33 @@ makeAccumulator join = do
       addToAccBeh :: Behavior ( FeedbackValue -> FeedbackValues)
       addToAccBeh = pure addToAccumulate <*> accumulator
 
-  onEvent (apply addToAccBeh join) (liftIO . accHandler)
+  onEvent (apply addToAccBeh joinnEvent) (liftIO . accHandler)
   return accumulator
 
 -- configure and return output cell for excell
 ioCell :: Coordinates -> (Event FeedbackValue, Handler FeedbackValue) -> UI Element
 ioCell coordinates joinpair = do
 
-  -- creating elements and events
-  outputcell        <- UI.input
-  (flush, _)        <- bufferedEvent outputcell
+  outputcell    <- UI.input
+  (flush, _)    <- bufferedEvent outputcell
 
-  exprBehavior      <- stepper (Left NoValue) flush
-  finalpair <- liftIO newEvent :: UI(Event String, Handler String)
+  inputHold     <- stepper (Left NoValue) flush
 
   let
-      join = fst joinpair
-      joinHandle = snd joinpair
-      final = fst finalpair
-      finalHandler = snd finalpair
+      filteredJoinEvent = filterE (\e -> fst e /= coordinates) $ fst joinpair
 
-  -- make accumulator
-  accumulator <- makeAccumulator join
+  accumulator   <- makeAccumulator filteredJoinEvent
 
   let
-      -- make behavior for proccessing expression
-      processExprBeh :: Behavior Expression
-      processExprBeh = (pure processExpression <*> accumulator) <*> exprBehavior
+      processExprBeh= pure (>>=) <*> inputHold <*> (pure processExpression <*> accumulator)
+      evaluateExprBeh = pure (>>=) <*> processExprBeh <*> pure P.evaluate
+      showOutputBeh = pure showOutput <*> evaluateExprBeh
 
-  -- on filtered event evaluate expression and add it for display at final event
-  filteredEvent <- getFilteredEvent coordinates flush join
-  onEvent filteredEvent $ \_ -> liftIO $ finalHandler.show.P.evaluate =<< currentValue processExprBeh
 
-  --on change of cell formula evaluate formula and add it for display at final event
-  onEvent flush $ \_ -> liftIO $ finalHandler.show.P.evaluate =<< currentValue processExprBeh
+  _ <- element outputcell # sink value showOutputBeh
 
-  -- on new value for display add value to joined event
-  finalBehavior <-stepper "0" final
-  onEvent final $ \_ -> liftIO $ joinHandle . (\s -> (coordinates, read s)) =<<  currentValue finalBehavior 
+  -- add on filteredREferenced event
+  -- onEvent  filteredJoinEvent $ \_ -> liftIO . snd joinpair . toFeedback coordinates =<< currentValue evaluateExprBeh
+  onEvent  flush  $ \_ -> liftIO . snd joinpair . toFeedback coordinates =<< currentValue evaluateExprBeh
 
-  -- display finalBehavior in cell
-  _ <- element outputcell # sink value finalBehavior
---
   return outputcell

@@ -1,5 +1,4 @@
 import Control.Monad
-import  qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
 import qualified EXReactive as R
 
@@ -8,9 +7,9 @@ main =  startGUI defaultConfig setup
 
 setup :: Window -> UI ()
 setup window = void $ do
-  return window # set title "Excell"
+  _     <-return window # set title "Excell"
 
-  event <- liftIO newEvent :: UI(Event (R.Coordinates, Integer), Handler (R.Coordinates, Integer))
+  event <- liftIO newEvent :: UI(Event (R.Coordinates, Maybe Integer), Handler (R.Coordinates, Maybe Integer))
   let
       -- coordinates of the cells
       coordinates :: [[R.Coordinates]]

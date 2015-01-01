@@ -9,7 +9,7 @@ module EXData(
 
 type Coordinates = (Int, Int)
 type References = [Coordinates]
-type FeedbackValue = (Coordinates, Integer)
+type FeedbackValue = (Coordinates, Maybe Integer)
 type FeedbackValues = [FeedbackValue]
 data ExError = ParseError | EvaluationError | NoValue | ReferenceError
 
