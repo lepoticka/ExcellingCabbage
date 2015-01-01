@@ -22,6 +22,15 @@ makeGrid field = grid $ letters : field2
     field2 = zipWith (:) (map (string.show) [1..width]) $ map (map element) field
 
 
+-- get cell values from Expression
+getReference :: Expression -> Either ExError References
+getReference (Constant _) = Right []
+getReference (Cell a b) = Right [(a,b)]
+getReference (Add a b) = liftM2 (++) (getReference a) $ getReference b
+getReference (Sub a b) = liftM2 (++) (getReference a) $ getReference b
+getReference (Mult a b) = liftM2 (++) (getReference a) $ getReference b
+getReference (Division a b) = liftM2 (++) (getReference a) $ getReference b
+
 -- accumulate new value
 addToAccumulate :: FeedbackValues -> FeedbackValue -> FeedbackValues
 addToAccumulate [] a = [a]
@@ -116,12 +125,20 @@ ioCell coordinates joinpair = do
       processExprBeh= pure (>>=) <*> inputHold <*> (pure processExpression <*> accumulator)
       evaluateExprBeh = pure (>>=) <*> processExprBeh <*> pure P.evaluate
       showOutputBeh = pure showOutput <*> evaluateExprBeh
+      referenceBeh = pure (>>=) <*> inputHold <*> pure getReference
+
+      checkReference :: Either ExError References -> FeedbackValue -> Bool
+      checkReference (Left _) _ = False
+      checkReference (Right a) v = fst v `elem` a
+
+      checkReferenceBeh = pure checkReference <*> referenceBeh
+      filteredReferenceEvent = filterApply checkReferenceBeh filteredJoinEvent
+
 
 
   _ <- element outputcell # sink value showOutputBeh
 
-  -- add on filteredREferenced event
-  -- onEvent  filteredJoinEvent $ \_ -> liftIO . snd joinpair . toFeedback coordinates =<< currentValue evaluateExprBeh
+  onEvent  filteredReferenceEvent $ \_ -> liftIO . snd joinpair . toFeedback coordinates =<< currentValue evaluateExprBeh
   onEvent  flush  $ \_ -> liftIO . snd joinpair . toFeedback coordinates =<< currentValue evaluateExprBeh
 
   return outputcell
