@@ -1,14 +1,12 @@
 module EXParser(
     Expression(..),
     evaluate,
-    processParse,
     parseArithmetic
 ) where
 
 
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
-import Text.Parsec.Error
 import Data.Char
 import EXData
 import Control.Monad
@@ -59,12 +57,14 @@ expr = buildExpressionParser table factor
 
 
 -- function for parsing
-parseArithmetic :: String -> Either Text.Parsec.Error.ParseError Expression
-parseArithmetic = parse expr "" . removeSpace
+parseArithmetic :: String -> Either ExError Expression
+parseArithmetic s 
+  | s == "" = Left NoValue
+  | isLeft value = Left ParseError
+  | otherwise = Right (fromRight value)
+ where
+    value = parse expr "" $ removeSpace s
 
-processParse :: Either Text.Parsec.Error.ParseError Expression -> Either ExError Expression
-processParse (Left _) = Left ParseError
-processParse (Right a) = Right a
 
 evaluate :: Expression -> Either ExError Expression
 evaluate expression

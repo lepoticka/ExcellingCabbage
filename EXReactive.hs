@@ -49,6 +49,7 @@ processExpression _ a@(Constant _) = Right a
 processExpression [] (Cell _ _) = Left NoValue
 processExpression (x:xs) c@(Cell a b)
   | fst x == (a,b) && isJust (snd x) = Right (Constant (fromJust $ snd x))
+  | fst x == (a,b) && isNothing (snd x) = Left ReferenceError
   |otherwise = processExpression xs c
 
 
@@ -78,7 +79,7 @@ toFeedback coordinates (Right (Division _ _)) = (coordinates, Nothing)
 -- return on enter trigered Expression and event handler
 bufferedEvent :: Element -> UI (Event (Either ExError Expression), Handler (Either ExError Expression))
 bufferedEvent inputCell = do
-  buffer    <- stepper (Left NoValue) $ apply (pure (P.processParse . P.parseArithmetic)) $ UI.valueChange inputCell
+  buffer    <- stepper (Left NoValue) $ apply (pure P.parseArithmetic) $ UI.valueChange inputCell
   flushpair <- liftIO newEvent :: UI(Event (Either ExError Expression), Handler (Either ExError Expression))
 
   let
