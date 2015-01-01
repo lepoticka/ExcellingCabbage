@@ -1,5 +1,4 @@
 module EXParser(
-    Expression(..),
     evaluate,
     parseArithmetic
 ) where
