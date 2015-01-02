@@ -1,7 +1,8 @@
 module EXReactive(
   ioCell,
   makeGrid,
-  Coordinates
+  Coordinates,
+  displayElement
 ) where
 
 import  qualified Graphics.UI.Threepenny as UI
@@ -14,12 +15,13 @@ import qualified EXParser as P
 
 
 -- make display grid
-makeGrid :: [[Element]] -> UI Element
-makeGrid field = grid $ letters : field2
+makeGrid :: [[Element]] -> Element -> UI Element
+makeGrid field display= grid $ displayL : letters : field2
   where
     width = length $ head field
     letters = string "" : map (string.(: []).chr.(+) (ord 'a' -1)) [1..width]
     field2 = zipWith (:) (map (string.show) [1..width]) $ map (map element) field
+    displayL = [string "Formula: ", element display]
 
 
 -- get cell values from Expression
@@ -109,11 +111,20 @@ makeAccumulator joinnEvent = do
   return accumulator
 
 -- configure and return output cell for excell
-ioCell :: Coordinates -> (Event FeedbackValue, Handler FeedbackValue) -> UI Element
-ioCell coordinates joinpair = do
+ioCell :: (Event FeedbackValue, Handler FeedbackValue) -> Handler String -> Coordinates -> UI Element
+ioCell joinpair displayHandler coordinates= do
 
   outputcell    <- UI.input
   (flush, _)    <- bufferedEvent outputcell
+
+  let
+      formatedFormula :: String -> String
+      formatedFormula formula = chr (ord 'a' -1 + fst coordinates) : show (snd coordinates) ++ ": " ++ formula
+
+  exprStringBeh <- stepper "" $ UI.valueChange outputcell
+  onEvent (UI.focus outputcell) $ \_ -> liftIO . displayHandler.formatedFormula =<< currentValue exprStringBeh
+  onEvent ( filterE (==13) (UI.keydown outputcell)) $ \_ -> liftIO . displayHandler.formatedFormula =<< currentValue exprStringBeh
+
 
   inputHold     <- stepper (Left NoValue) flush
 
@@ -143,3 +154,10 @@ ioCell coordinates joinpair = do
   onEvent  flush  $ \_ -> liftIO . snd joinpair . toFeedback coordinates =<< currentValue evaluateExprBeh
 
   return outputcell
+
+displayElement :: Event String  -> UI Element
+displayElement displayEvent = do
+  displayEl    <- UI.input
+  displayBeh        <- stepper "" displayEvent
+  _                 <- element displayEl # sink value displayBeh
+  return displayEl
