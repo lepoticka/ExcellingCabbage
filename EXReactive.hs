@@ -117,25 +117,58 @@ ioCell joinpair displayHandler coordinates= do
   outputcell    <- UI.input
   (flush, flushHandle)    <- bufferedEvent outputcell
   inputHold     <- stepper (Left NoValue) flush
-
-  -- display
+--
   let
-      exprToStr :: Either ExError Expression -> String
-      exprToStr a@(Left _) = showOutput a
-      exprToStr a@(Right(Constant _)) = showOutput a
-      exprToStr (Right(Add a b)) = "(" ++ exprToStr (Right a) ++ " + " ++ exprToStr (Right b) ++ ")"
-      exprToStr (Right(Sub a b)) = "(" ++ exprToStr (Right a) ++ " - " ++ exprToStr (Right b) ++ ")"
-      exprToStr (Right(Mult a b)) = "(" ++ exprToStr (Right a) ++ " * " ++ exprToStr (Right b) ++ ")"
-      exprToStr (Right(Division a b)) = "(" ++ exprToStr (Right a) ++ " / " ++ exprToStr (Right b) ++ ")"
-      exprToStr (Right(Cell a b)) = chr (ord 'a' -1 + a) : show b
+      filteredJoinEvent = filterE (\e -> fst e /= coordinates) $ fst joinpair
 
+  accumulator   <- makeAccumulator filteredJoinEvent
+
+  let
+      processExprBeh= pure (>>=) <*> inputHold <*> (pure processExpression <*> accumulator)
+      evaluateExprBeh = pure (>>=) <*> processExprBeh <*> pure P.evaluate
+      showOutputBeh = pure showOutput <*> evaluateExprBeh
+      referenceBeh = pure (>>=) <*> inputHold <*> pure getReference
+
+      checkReference :: Either ExError References -> FeedbackValue -> Bool
+      checkReference (Left _) _ = False
+      checkReference (Right a) v = fst v `elem` a
+
+      checkReferenceBeh = pure checkReference <*> referenceBeh
+      filteredReferenceEvent = filterApply checkReferenceBeh filteredJoinEvent
+
+
+  _ <- element outputcell # sink value showOutputBeh
+
+  onEvent  filteredReferenceEvent $ \_ -> liftIO . snd joinpair . toFeedback coordinates =<< currentValue evaluateExprBeh
+ 
+  -- display formula
+  let
       formatedFormula :: Either ExError Expression -> String
       formatedFormula formula = chr (ord 'a' -1 + fst coordinates) : show (snd coordinates) ++ ": " ++ exprToStr formula
 
   onEvent flush $ liftIO . displayHandler.formatedFormula
   onEvent (UI.focus outputcell) $ \_ -> liftIO . displayHandler.formatedFormula =<< currentValue inputHold
+  onEvent  flush  $ \_ -> liftIO . snd joinpair . toFeedback coordinates =<< currentValue evaluateExprBeh
 
---
+  _ <- setKeyIncrement outputcell flushHandle inputHold
+
+  return outputcell
+
+
+-- convert Expression to string
+exprToStr :: Either ExError Expression -> String
+exprToStr a@(Left _) = showOutput a
+exprToStr a@(Right(Constant _)) = showOutput a
+exprToStr (Right(Add a b)) = "(" ++ exprToStr (Right a) ++ " + " ++ exprToStr (Right b) ++ ")"
+exprToStr (Right(Sub a b)) = "(" ++ exprToStr (Right a) ++ " - " ++ exprToStr (Right b) ++ ")"
+exprToStr (Right(Mult a b)) = "(" ++ exprToStr (Right a) ++ " * " ++ exprToStr (Right b) ++ ")"
+exprToStr (Right(Division a b)) = "(" ++ exprToStr (Right a) ++ " / " ++ exprToStr (Right b) ++ ")"
+exprToStr (Right(Cell a b)) = chr (ord 'a' -1 + a) : show b
+
+
+-- key arrow increment
+setKeyIncrement :: Element -> Handler (Either ExError Expression) -> Behavior (Either ExError Expression) -> UI ()
+setKeyIncrement outputcell flushHandle inputHold = do
   -- timer
   timer <- UI.timer # set UI.interval 200
   deltaPair <- liftIO newEvent :: UI(Event Integer, Handler Integer)
@@ -169,33 +202,6 @@ ioCell joinpair displayHandler coordinates= do
   -- increment expression
   onEvent (UI.tick timer) $ \_ -> liftIO $ flushHandle =<< currentValue (pure incrementExpr <*> inputHold <*> deltaBeh)
 
-
-  let
-      filteredJoinEvent = filterE (\e -> fst e /= coordinates) $ fst joinpair
-
-  accumulator   <- makeAccumulator filteredJoinEvent
-
-  let
-      processExprBeh= pure (>>=) <*> inputHold <*> (pure processExpression <*> accumulator)
-      evaluateExprBeh = pure (>>=) <*> processExprBeh <*> pure P.evaluate
-      showOutputBeh = pure showOutput <*> evaluateExprBeh
-      referenceBeh = pure (>>=) <*> inputHold <*> pure getReference
-
-      checkReference :: Either ExError References -> FeedbackValue -> Bool
-      checkReference (Left _) _ = False
-      checkReference (Right a) v = fst v `elem` a
-
-      checkReferenceBeh = pure checkReference <*> referenceBeh
-      filteredReferenceEvent = filterApply checkReferenceBeh filteredJoinEvent
-
-
-
-  _ <- element outputcell # sink value showOutputBeh
-
-  onEvent  filteredReferenceEvent $ \_ -> liftIO . snd joinpair . toFeedback coordinates =<< currentValue evaluateExprBeh
-  onEvent  flush  $ \_ -> liftIO . snd joinpair . toFeedback coordinates =<< currentValue evaluateExprBeh
-
-  return outputcell
 
 displayElement :: Event String  -> UI Element
 displayElement displayEvent = do
