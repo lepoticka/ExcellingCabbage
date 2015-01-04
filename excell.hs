@@ -17,7 +17,7 @@ setup window = void $ do
       coordinates = [[(a,b)| a <- [1..5]] |   b <- [1..5]]
 
       outputsUI :: [[UI Element]]
-      outputsUI = map (map $ R.ioCell event $ snd displayEvent) coordinates
+      outputsUI = map (map $ R.ioCell event $ snd displayEvent ) coordinates
 
   outputs <- mapM sequence outputsUI
 

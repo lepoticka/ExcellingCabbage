@@ -115,18 +115,60 @@ ioCell :: (Event FeedbackValue, Handler FeedbackValue) -> Handler String -> Coor
 ioCell joinpair displayHandler coordinates= do
 
   outputcell    <- UI.input
-  (flush, _)    <- bufferedEvent outputcell
+  (flush, flushHandle)    <- bufferedEvent outputcell
+  inputHold     <- stepper (Left NoValue) flush
+
+  -- display
+  let
+      exprToStr :: Either ExError Expression -> String
+      exprToStr a@(Left _) = showOutput a
+      exprToStr a@(Right(Constant _)) = showOutput a
+      exprToStr (Right(Add a b)) = "(" ++ exprToStr (Right a) ++ " + " ++ exprToStr (Right b) ++ ")"
+      exprToStr (Right(Sub a b)) = "(" ++ exprToStr (Right a) ++ " - " ++ exprToStr (Right b) ++ ")"
+      exprToStr (Right(Mult a b)) = "(" ++ exprToStr (Right a) ++ " * " ++ exprToStr (Right b) ++ ")"
+      exprToStr (Right(Division a b)) = "(" ++ exprToStr (Right a) ++ " / " ++ exprToStr (Right b) ++ ")"
+      exprToStr (Right(Cell a b)) = chr (ord 'a' -1 + a) : show b
+
+      formatedFormula :: Either ExError Expression -> String
+      formatedFormula formula = chr (ord 'a' -1 + fst coordinates) : show (snd coordinates) ++ ": " ++ exprToStr formula
+
+  onEvent flush $ liftIO . displayHandler.formatedFormula
+  onEvent (UI.focus outputcell) $ \_ -> liftIO . displayHandler.formatedFormula =<< currentValue inputHold
+
+--
+  -- timer
+  timer <- UI.timer # set UI.interval 200
+  deltaPair <- liftIO newEvent :: UI(Event Integer, Handler Integer)
+  deltaBeh  <- stepper 0 $ fst deltaPair
 
   let
-      formatedFormula :: String -> String
-      formatedFormula formula = chr (ord 'a' -1 + fst coordinates) : show (snd coordinates) ++ ": " ++ formula
+      updownEvent = fmap (\a -> if a == 38 then 1 else -1) $ filterE (\e -> e == 38 || e == 40) $ UI.keydown outputcell
 
-  exprStringBeh <- stepper "" $ UI.valueChange outputcell
-  onEvent (UI.focus outputcell) $ \_ -> liftIO . displayHandler.formatedFormula =<< currentValue exprStringBeh
-  onEvent ( filterE (==13) (UI.keydown outputcell)) $ \_ -> liftIO . displayHandler.formatedFormula =<< currentValue exprStringBeh
+      runTimer = do
+        running <- get UI.running timer
+        unless running $ UI.start timer
+
+      incrementExpr :: Either ExError Expression -> Integer -> Either ExError Expression
+      incrementExpr (Left a) _ = Left a
+      incrementExpr (Right (Constant a)) b = Right (Constant (a+b))
+      incrementExpr v@(Right (Add _ _ )) _ = v
+      incrementExpr v@(Right (Sub _ _ )) _ = v
+      incrementExpr v@(Right (Mult _ _ )) _ = v
+      incrementExpr v@(Right (Division _ _ )) _ = v
+      incrementExpr v@(Right (Cell _ _ )) _ = v
 
 
-  inputHold     <- stepper (Left NoValue) flush
+  -- start/stop timer
+  onEvent updownEvent $ const runTimer
+  onEvent (filterE (\e -> e == 38 || e == 40) $ UI.keyup outputcell) $ \_ -> UI.stop timer
+
+  -- change delta value
+  onEvent updownEvent $ \e -> liftIO $ snd deltaPair e
+  onEvent (UI.keyup outputcell) $ \_ -> liftIO $ snd deltaPair 0
+
+  -- increment expression
+  onEvent (UI.tick timer) $ \_ -> liftIO $ flushHandle =<< currentValue (pure incrementExpr <*> inputHold <*> deltaBeh)
+
 
   let
       filteredJoinEvent = filterE (\e -> fst e /= coordinates) $ fst joinpair
