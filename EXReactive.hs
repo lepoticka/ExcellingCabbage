@@ -93,7 +93,7 @@ bufferedEvent inputCell = do
 
 
 --make accumulate Behavior
-makeAccumulator:: Event FeedbackValue -> UI (Behavior FeedbackValues)
+makeAccumulator:: Event FeedbackValues -> UI (Behavior FeedbackValues)
 makeAccumulator joinnEvent = do
   accpair   <- liftIO newEvent :: UI (Event FeedbackValues, Handler FeedbackValues)
 
@@ -105,21 +105,21 @@ makeAccumulator joinnEvent = do
 
   let
       addToAccBeh :: Behavior ( FeedbackValue -> FeedbackValues)
-      addToAccBeh = pure addToAccumulate <*> accumulator
+      addToAccBeh = pure foldl <*> (pure addToAccumulate <*> accumulator)
 
   onEvent (apply addToAccBeh joinnEvent) (liftIO . accHandler)
   return accumulator
 
 -- configure and return output cell for excell
-ioCell :: (Event FeedbackValue, Handler FeedbackValue) -> Handler String -> Coordinates -> UI Element
-ioCell joinpair displayHandler coordinates= do
+ioCell :: Event FeedbackValues -> Handler FeedbackValue -> Handler String -> Coordinates -> UI Element
+ioCell join myHandler displayHandler coordinates= do
 
   outputcell    <- UI.input
   (flush, flushHandle)    <- bufferedEvent outputcell
   inputHold     <- stepper (Left NoValue) flush
 --
   let
-      filteredJoinEvent = filterE (\e -> fst e /= coordinates) $ fst joinpair
+      filteredJoinEvent = filterE (/= []) $ fmap (filter (\a -> fst a /= coordinates)) join
 
   accumulator   <- makeAccumulator filteredJoinEvent
 
@@ -134,12 +134,13 @@ ioCell joinpair displayHandler coordinates= do
       checkReference (Right a) v = fst v `elem` a
 
       checkReferenceBeh = pure checkReference <*> referenceBeh
-      filteredReferenceEvent = filterApply checkReferenceBeh filteredJoinEvent
+      filteredReferenceEvent :: Event FeedbackValues
+      filteredReferenceEvent = filterE (/=[]) $ (pure filter <*> checkReferenceBeh) <@> filteredJoinEvent
 
 
   _ <- element outputcell # sink value showOutputBeh
 
-  onEvent  filteredReferenceEvent $ \_ -> liftIO . snd joinpair . toFeedback coordinates =<< currentValue evaluateExprBeh
+  onEvent  filteredReferenceEvent $ \_ -> liftIO . myHandler . toFeedback coordinates =<< currentValue evaluateExprBeh
  
   -- display formula
   let
@@ -148,7 +149,7 @@ ioCell joinpair displayHandler coordinates= do
 
   onEvent flush $ liftIO . displayHandler.formatedFormula
   onEvent (UI.focus outputcell) $ \_ -> liftIO . displayHandler.formatedFormula =<< currentValue inputHold
-  onEvent  flush  $ \_ -> liftIO . snd joinpair . toFeedback coordinates =<< currentValue evaluateExprBeh
+  onEvent  flush  $ \_ -> liftIO . myHandler . toFeedback coordinates =<< currentValue evaluateExprBeh
 
   _ <- setKeyIncrement outputcell flushHandle inputHold
 
