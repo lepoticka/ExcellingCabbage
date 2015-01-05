@@ -94,7 +94,7 @@ bufferedEvent inputCell = do
 
 --make accumulate Behavior
 makeAccumulator:: Event FeedbackValues -> UI (Behavior FeedbackValues)
-makeAccumulator joinnEvent = do
+makeAccumulator joinEvent = do
   accpair   <- liftIO newEvent :: UI (Event FeedbackValues, Handler FeedbackValues)
 
   let
@@ -103,23 +103,20 @@ makeAccumulator joinnEvent = do
 
   accumulator   <- stepper [] acc
 
-  let
-      addToAccBeh :: Behavior ( FeedbackValue -> FeedbackValues)
-      addToAccBeh = pure foldl <*> (pure addToAccumulate <*> accumulator)
+  onEvent joinEvent $ \e -> liftIO . accHandler . flip (foldl addToAccumulate) e =<< currentValue accumulator
 
-  onEvent (apply addToAccBeh joinnEvent) (liftIO . accHandler)
   return accumulator
 
 -- configure and return output cell for excell
 ioCell :: Event FeedbackValues -> Handler FeedbackValue -> Handler String -> Coordinates -> UI Element
-ioCell join myHandler displayHandler coordinates= do
+ioCell joinEvent myHandler displayHandler coordinates= do
 
   outputcell    <- UI.input
   (flush, flushHandle)    <- bufferedEvent outputcell
   inputHold     <- stepper (Left NoValue) flush
 --
   let
-      filteredJoinEvent = filterE (/= []) $ fmap (filter (\a -> fst a /= coordinates)) join
+      filteredJoinEvent = filterE (/= []) $ fmap (filter (\a -> fst a /= coordinates)) joinEvent
 
   accumulator   <- makeAccumulator filteredJoinEvent
 
