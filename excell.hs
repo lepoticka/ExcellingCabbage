@@ -12,11 +12,14 @@ setup window = void $ do
 
   -- sepperate events for each cell
   let
+      width = 5 :: Int
+      height = 5 :: Int
       cellEventsUI :: [[UI(Event FeedbackValue, Handler FeedbackValue)]]
-      cellEventsUI = [[liftIO newEvent | _ <- [1..5]] | _<- [1..5]]
+      cellEventsUI = [[liftIO newEvent | _ <- [1..width]] | _<- [1..height]]
   cellEvents <- mapM sequence cellEventsUI
 
 
+  -- make display event
   displayEvent <- liftIO newEvent :: UI(Event String, Handler String)
   let
       -- joined event
@@ -24,13 +27,15 @@ setup window = void $ do
       joinEvent = unions $ concatMap (map fst) cellEvents
       -- coordinates of the cells
       coordinates :: [[R.Coordinates]]
-      coordinates = [[(a,b)| a <- [1..5]] |   b <- [1..5]]
+      coordinates = [[(a,b)| a <- [1..width]] |   b <- [1..height]]
 
       outputsUI :: [[UI Element]]
       outputsUI = map (map ( \(a,b) -> R.ioCell joinEvent b (snd displayEvent) a)) $ zipWith zip coordinates $ fmap (fmap snd) cellEvents
 
+  -- get cell elements from UI monad
   outputs <- mapM sequence outputsUI
 
+  -- construct html page look
   displayEl <- R.displayElement $ fst displayEvent
   getBody window #+ [
     column [ R.makeGrid outputs displayEl

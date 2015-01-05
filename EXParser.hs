@@ -12,10 +12,11 @@ import Control.Monad
 import Data.Either.Unwrap
 
 
+-- possible operators and their percendance
 table :: OperatorTable Char () Expression
 table = [ [op "*" Mult AssocLeft, op "/" Division AssocLeft], [op "+" Add AssocLeft, op "-" Sub AssocLeft]]
         where
-            op s f assoc = Infix( do {_ <- string s; return f;} ) assoc
+            op s f = Infix(string s >> return f)
 
 -- bracket parser
 factor :: Parser Expression
@@ -65,6 +66,8 @@ parseArithmetic s
     value = parse expr "" $ removeSpace s
 
 
+-- evaluation of expressions ( error of constant )
+-- type change for ease of calculation
 evaluate :: Expression -> Either ExError Expression
 evaluate expression
   | isRight value = fmap Constant value
@@ -72,7 +75,7 @@ evaluate expression
  where
    value = evaluateHelper expression
 
--- Function for evaluation
+-- helper function for expression evaluation
 evaluateHelper :: Expression -> Either ExError Integer
 evaluateHelper (Cell _ _) = Left EvaluationError
 evaluateHelper (Constant a) = Right a
