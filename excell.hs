@@ -1,48 +1,42 @@
-import Control.Monad    (void)
-import Data.Maybe
-import Text.Printf
-import Safe             (readMay)
-import  qualified Graphics.UI.Threepenny as UI
+import Control.Monad
 import Graphics.UI.Threepenny.Core
-
-import qualified ExcellingCabbage as EC
-
-parserBehavior :: Behavior (String -> EC.Expression)
-parserBehavior = pure (EC.processParse . EC.parseArithmetic)
---
-evaluateBehavior :: Behavior (EC.Expression -> Integer)
-evaluateBehavior = pure EC.evaluate
-
-convertBehavior :: Behavior (Integer -> String)
-convertBehavior = pure show
-
-
+import qualified EXReactive as R
+import EXData
 
 main::IO()
 main =  startGUI defaultConfig setup
 
 setup :: Window -> UI ()
 setup window = void $ do
-    return window # set title "Excell"
+  _     <-return window # set title "Excell"
 
-    inputCelica     <- UI.input
-    outputCelica    <- UI.input
+  -- sepperate events for each cell
+  let
+      width = 5 :: Int
+      height = 5 :: Int
+      cellEventsUI :: [[UI(Event FeedbackValue, Handler FeedbackValue)]]
+      cellEventsUI = [[liftIO newEvent | _ <- [1..width]] | _<- [1..height]]
+  cellEvents <- mapM sequence cellEventsUI
 
-    getBody window #+ [
-            column [
-                grid [[string "Input celica", element inputCelica]
-                    , [string "Output celica", element outputCelica]]
-            ]]
 
-    let 
-        procEvent           =  apply parserBehavior $ UI.valueChange inputCelica
-        evalEvent           =  apply evaluateBehavior procEvent
-        convertEvent        = apply convertBehavior evalEvent
+  -- make display event
+  displayEvent <- liftIO newEvent :: UI(Event String, Handler String)
+  let
+      -- joined event
+      joinEvent :: Event [FeedbackValue]
+      joinEvent = unions $ concatMap (map fst) cellEvents
+      -- coordinates of the cells
+      coordinates :: [[R.Coordinates]]
+      coordinates = [[(a,b)| a <- [1..width]] |   b <- [1..height]]
 
-    procBehavior            <- stepper (EC.Constant 0) procEvent
-    evalBehavior            <- stepper 0 evalEvent
-    convertBehavior         <- stepper "0" convertEvent
+      outputsUI :: [[UI Element]]
+      outputsUI = map (map ( \(a,b) -> R.ioCell joinEvent b (snd displayEvent) a)) $ zipWith zip coordinates $ fmap (fmap snd) cellEvents
 
-    -- inputIn <- stepper "0" $ UI.valueChange inputCelica
+  -- get cell elements from UI monad
+  outputs <- mapM sequence outputsUI
 
-    element outputCelica # sink value convertBehavior
+  -- construct html page look
+  displayEl <- R.displayElement $ fst displayEvent
+  getBody window #+ [
+    column [ R.makeGrid outputs displayEl
+      ]]

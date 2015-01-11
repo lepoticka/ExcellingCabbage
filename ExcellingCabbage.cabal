@@ -17,17 +17,20 @@ extra-source-files:  README.md
 cabal-version:       >=1.10
 
 Library
-    exposed-modules:    ExcellingCabbage
+    exposed-modules:    EXParser, EXReactive, EXData
     Build-Depends:      parsec == 3.1.7,
+                        threepenny-gui == 0.5.0.0,
                         base >= 4.2 && < 5,
-                        text
+                        text,
+                        either-unwrap == 1.1
     Default-Language:   Haskell2010
 
 Executable excell
     Main-Is:            excell.hs
-    Build-Depends:      threepenny-gui == 0.5.0.0,
+    Build-Depends:      ExcellingCabbage,
+                        threepenny-gui == 0.5.0.0,
                         base >= 4.2 && < 5,
                         safe,
-                        ExcellingCabbage,
-                        parsec == 3.1.7
+                        parsec == 3.1.7,
+                        either-unwrap == 1.1
     Default-Language:   Haskell2010
