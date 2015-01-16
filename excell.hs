@@ -4,16 +4,14 @@ import qualified Graphics.UI.Threepenny.Elements as E
 import qualified EXReactive as R
 import EXData
 
--- config::Config
--- config = Config { tpStatic = Just "/home/luka/WorkingDirectory/ExcellingCabbage/css/style.css" }
-
 main::IO()
 main =  startGUI defaultConfig setup
 
 setup :: Window -> UI ()
 setup window = void $ do
   _     <- return window # set title "Excell"
-  _     <- E.addStyleSheet window "style.css"
+  getBody window #+ [E.h1 #+ [string "Reactive Excell"]]
+
 
   -- sepperate events for each cell
   let
@@ -40,7 +38,7 @@ setup window = void $ do
   -- get cell elements from UI monad
   outputs <- mapM sequence outputsUI
 
-  -- construct html page look
+  -- construct html cell distribution
   displayEl <- R.displayElement $ fst displayEvent
   getBody window #+ [
     column [ R.makeGrid outputs displayEl
