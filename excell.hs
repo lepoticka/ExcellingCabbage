@@ -1,14 +1,19 @@
 import Control.Monad
 import Graphics.UI.Threepenny.Core
+import qualified Graphics.UI.Threepenny.Elements as E
 import qualified EXReactive as R
 import EXData
+
+-- config::Config
+-- config = Config { tpStatic = Just "/home/luka/WorkingDirectory/ExcellingCabbage/css/style.css" }
 
 main::IO()
 main =  startGUI defaultConfig setup
 
 setup :: Window -> UI ()
 setup window = void $ do
-  _     <-return window # set title "Excell"
+  _     <- return window # set title "Excell"
+  _     <- E.addStyleSheet window "style.css"
 
   -- sepperate events for each cell
   let
