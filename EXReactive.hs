@@ -7,6 +7,7 @@ module EXReactive(
 
 import  qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
+import Graphics.UI.Threepenny.Attributes
 import Data.Char
 import Control.Monad
 import EXData
@@ -215,4 +216,4 @@ displayElement displayEvent = do
   displayEl    <- UI.input
   displayBeh        <- stepper "" displayEvent
   _                 <- element displayEl # sink value displayBeh
-  return displayEl
+  element displayEl # set enabled False
