@@ -47,7 +47,8 @@ processExpression c (Sub a b) = liftM2 Sub (processExpression c a) (processExpre
 processExpression c (Mult a b) = liftM2 Mult (processExpression c a) (processExpression c b)
 processExpression c (Division a b) = liftM2 Division (processExpression c a) (processExpression c b)
 processExpression _ a@(Constant _) = Right a
-processExpression [] (Cell _ _) = Left NoValue
+-- processExpression [] (Cell _ _) = Left NoValue
+processExpression [] (Cell _ _) = Left ReferenceError
 processExpression (x:xs) c@(Cell a b)
   | fst x == (a,b) && isJust (snd x) = Right (Constant (fromJust $ snd x))
   | fst x == (a,b) && isNothing (snd x) = Left ReferenceError
