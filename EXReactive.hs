@@ -7,6 +7,7 @@ module EXReactive(
 
 import  qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
+import Graphics.UI.Threepenny.Attributes
 import Data.Char
 import Control.Monad
 import EXData
@@ -46,7 +47,8 @@ processExpression c (Sub a b) = liftM2 Sub (processExpression c a) (processExpre
 processExpression c (Mult a b) = liftM2 Mult (processExpression c a) (processExpression c b)
 processExpression c (Division a b) = liftM2 Division (processExpression c a) (processExpression c b)
 processExpression _ a@(Constant _) = Right a
-processExpression [] (Cell _ _) = Left NoValue
+-- processExpression [] (Cell _ _) = Left NoValue
+processExpression [] (Cell _ _) = Left ReferenceError
 processExpression (x:xs) c@(Cell a b)
   | fst x == (a,b) && isJust (snd x) = Right (Constant (fromJust $ snd x))
   | fst x == (a,b) && isNothing (snd x) = Left ReferenceError
@@ -215,4 +217,4 @@ displayElement displayEvent = do
   displayEl    <- UI.input
   displayBeh        <- stepper "" displayEvent
   _                 <- element displayEl # sink value displayBeh
-  return displayEl
+  element displayEl # set enabled False

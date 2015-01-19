@@ -1,5 +1,6 @@
 import Control.Monad
 import Graphics.UI.Threepenny.Core
+import qualified Graphics.UI.Threepenny.Elements as E
 import qualified EXReactive as R
 import EXData
 
@@ -8,7 +9,9 @@ main =  startGUI defaultConfig setup
 
 setup :: Window -> UI ()
 setup window = void $ do
-  _     <-return window # set title "Excell"
+  _     <- return window # set title "Excell"
+  getBody window #+ [E.h1 #+ [string "Reactive Excell"]]
+
 
   -- sepperate events for each cell
   let
@@ -35,7 +38,7 @@ setup window = void $ do
   -- get cell elements from UI monad
   outputs <- mapM sequence outputsUI
 
-  -- construct html page look
+  -- construct html cell distribution
   displayEl <- R.displayElement $ fst displayEvent
   getBody window #+ [
     column [ R.makeGrid outputs displayEl
