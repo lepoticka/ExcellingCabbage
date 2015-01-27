@@ -3,7 +3,7 @@
 
 name:                ExcellingCabbage
 version:             0.1.0.0
-synopsis:            Reactive, bare implementation of excell.
+synopsis:            Functional Reactive programming, bare implementation of excel.
 -- description:         
 homepage:            github.com/LukaK/ExcellingCabbage
 license:             GPL-2
